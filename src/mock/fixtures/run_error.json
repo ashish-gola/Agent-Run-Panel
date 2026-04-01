@@ -1,0 +1,124 @@
+[
+  {
+    "type": "run_started",
+    "run_id": "r_002",
+    "query": "Analyse Apple R&D intensity vs peers",
+    "timestamp": 1700100000000
+  },
+  {
+    "type": "agent_thought",
+    "task_id": "coordinator",
+    "thought": "Breaking into 4 tasks: fetch filings, compare peers, and summarize findings",
+    "timestamp": 1700100001000
+  },
+  {
+    "type": "task_spawned",
+    "task_id": "t_101",
+    "label": "Fetch Apple filings",
+    "agent": "fetcher",
+    "spawned_by": "coordinator",
+    "parallel_group": "data_collection",
+    "depends_on": [],
+    "timestamp": 1700100002000
+  },
+  {
+    "type": "task_spawned",
+    "task_id": "t_102",
+    "label": "Fetch Microsoft filings",
+    "agent": "fetcher",
+    "spawned_by": "coordinator",
+    "parallel_group": "data_collection",
+    "depends_on": [],
+    "timestamp": 1700100003000
+  },
+  {
+    "type": "tool_call",
+    "task_id": "t_101",
+    "tool": "sec_api",
+    "input_summary": "AAPL filings 2023-2024",
+    "timestamp": 1700100004000
+  },
+  {
+    "type": "tool_result",
+    "task_id": "t_101",
+    "tool": "sec_api",
+    "output_summary": "Fetched 5 filings successfully",
+    "timestamp": 1700100005000
+  },
+  {
+    "type": "partial_output",
+    "task_id": "t_101",
+    "content": "Apple R&D spending: $29.9B (2023), $30.7B (2024). YoY growth: 2.7%",
+    "is_final": false,
+    "quality_score": null,
+    "timestamp": 1700100006000
+  },
+  {
+    "type": "tool_call",
+    "task_id": "t_102",
+    "tool": "sec_api",
+    "input_summary": "MSFT filings 2023-2024",
+    "timestamp": 1700100007000
+  },
+  {
+    "type": "tool_result",
+    "task_id": "t_102",
+    "tool": "sec_api",
+    "output_summary": "Request timed out while fetching filings",
+    "timestamp": 1700100008000
+  },
+  {
+    "type": "task_update",
+    "task_id": "t_102",
+    "status": "failed",
+    "error": "SEC API timeout after 3 retries.",
+    "timestamp": 1700100009000
+  },
+  {
+    "type": "task_spawned",
+    "task_id": "t_103",
+    "label": "Calculate R&D intensity",
+    "agent": "calculator",
+    "spawned_by": "coordinator",
+    "parallel_group": "analysis",
+    "depends_on": ["t_101", "t_102"],
+    "timestamp": 1700100010000
+  },
+  {
+    "type": "agent_thought",
+    "task_id": "coordinator",
+    "thought": "One upstream data source failed, so downstream analysis cannot complete reliably",
+    "timestamp": 1700100011000
+  },
+  {
+    "type": "task_update",
+    "task_id": "t_101",
+    "status": "complete",
+    "timestamp": 1700100012000
+  },
+  {
+    "type": "task_update",
+    "task_id": "t_103",
+    "status": "failed",
+    "error": "Cannot calculate intensity because required peer filing data is missing.",
+    "timestamp": 1700100013000
+  },
+  {
+    "type": "agent_thought",
+    "task_id": "coordinator",
+    "thought": "Run terminated with partial data collection and failed analysis",
+    "timestamp": 1700100014000
+  },
+  {
+    "type": "run_complete",
+    "run_id": "r_002",
+    "status": "failed",
+    "duration_ms": 14000,
+    "task_count": 3,
+    "output": {
+      "summary": "Run failed after a SEC API timeout prevented peer comparison from completing. Apple filings were fetched successfully, but the analysis could not produce a reliable final report.",
+      "citations": []
+    },
+    "timestamp": 1700100015000
+  }
+]

@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+	--bg-primary: #30364f;
+	--surface: #acbac4;
+	--accent: #e1d9bc;
+}
+
+html,
+body,
+#root {
+	min-height: 100%;
+}
+
+body {
+	margin: 0;
+	background:
+		radial-gradient(1200px 700px at 100% -10%, rgba(225, 217, 188, 0.08), transparent 55%),
+		radial-gradient(1000px 600px at -10% 110%, rgba(172, 186, 196, 0.14), transparent 60%),
+		var(--bg-primary);
+	color: #f2f5f8;
+	font-family: "Inter", "Segoe UI", "SF Pro Text", "Helvetica Neue", sans-serif;
+	font-weight: 400;
+	letter-spacing: 0.01em;
+}
