@@ -5,32 +5,35 @@ export default function ProgressBar({ tasks }) {
   const completed = tasks.filter((t) => t.status === "complete").length;
   const running = tasks.filter((t) => t.status === "running").length;
   const failed = tasks.filter((t) => t.status === "failed").length;
+  const cancelled = tasks.filter((t) => t.status === "cancelled").length;
+  const finished = completed + failed + cancelled;
 
-  const percent = total === 0 ? 0 : (completed / total) * 100;
+  const percent = total === 0 ? 0 : (finished / total) * 100;
 
   return (
-    <div className="rounded-2xl border border-[#ACBAC4]/30 bg-[#ACBAC4]/12 p-5 shadow-[0_12px_30px_rgba(15,20,35,0.3)] backdrop-blur-sm transition-all duration-300 hover:shadow-[0_18px_35px_rgba(20,28,45,0.35)]">
-      <div className="mb-3 flex items-center justify-between text-sm">
-        <span className="font-medium text-[#E9EEF3]">Run Progress</span>
-        <span className="rounded-full border border-[#E1D9BC]/45 bg-[#E1D9BC]/18 px-2 py-0.5 text-xs font-medium text-[#F4ECD1]">
+    <div className="rounded-2xl border border-white/10 bg-[#262d3f] p-5 shadow-[0_12px_28px_rgba(8,12,22,0.24)] sm:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3 text-sm">
+        <div>
+          <div className="text-xs uppercase tracking-[0.16em] text-[#AEBBC5]">Progress</div>
+          <span className="mt-1 block text-base font-medium text-white">Task progress</span>
+        </div>
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[#E8EEF3]">
           {Math.round(percent)}%
         </span>
       </div>
 
-      {/* Bar */}
-      <div className="h-3 w-full overflow-hidden rounded-full bg-[#30364F]/85">
+      <div className="h-3 w-full overflow-hidden rounded-full bg-[#1f2533]">
         <div
-          className="h-3 rounded-full bg-linear-to-r from-[#E1D9BC]/90 to-[#E1D9BC] shadow-[0_0_22px_rgba(225,217,188,0.45)] transition-all duration-500 ease-in-out"
+          className="h-3 rounded-full bg-linear-to-r from-[#E1D9BC] to-[#f2ead1] transition-all duration-500 ease-in-out"
           style={{ width: `${percent}%` }}
         />
       </div>
 
-      {/* Stats */}
-      <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-        <span className="rounded-lg border border-[#ACBAC4]/20 bg-[#30364F]/45 px-2 py-1 text-[#D8E1E8]">Done: {completed}</span>
-        <span className="rounded-lg border border-[#ACBAC4]/20 bg-[#30364F]/45 px-2 py-1 text-[#D8E1E8]">Running: {running}</span>
-        <span className="rounded-lg border border-[#ACBAC4]/20 bg-[#30364F]/45 px-2 py-1 text-[#D8E1E8]">Failed: {failed}</span>
-        <span className="rounded-lg border border-[#ACBAC4]/20 bg-[#30364F]/45 px-2 py-1 text-[#D8E1E8]">Total: {total}</span>
+      <div className="mt-4 grid gap-2 text-xs sm:grid-cols-4">
+        <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[#D8E1E8]">Total {total}</span>
+        <span className="rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-emerald-100">Done {completed}</span>
+        <span className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-amber-100">Working {running}</span>
+        <span className="rounded-xl border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-rose-100">Failed {failed}, stopped {cancelled}</span>
       </div>
     </div>
   );

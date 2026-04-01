@@ -1,273 +1,237 @@
 import { useReducer } from "react";
 
-/**
- * =========================
- * INITIAL STATE
- * =========================
- */
-const initialState = {
-  run: {
-    status: "idle", // idle | running | complete | failed
-    query: "",
-    startTime: null,
-  },
-  tasks: {},
-  thoughts: [],
-  finalOutput: null,
-};
-
-/**
- * =========================
- * REDUCER
- * =========================
- */
-function reducer(state, action) {
-  const { type, payload } = action;
-
-  switch (type) {
-    /**
-     * RUN START
-     */
-    case "RUN_STARTED":
-      return {
-        ...state,
-        run: {
-          status: "running",
-          query: payload.query,
-          startTime: Date.now(),
-        },
-      };
-
-    /**
-     * TASK CREATED
-     */
-    case "TASK_SPAWNED":
-      return {
-        ...state,
-        tasks: {
-          ...state.tasks,
-          [payload.task_id]: {
-            id: payload.task_id,
-            label: payload.label,
-            agent: payload.agent,
-            status: "running",
-            toolCalls: [],
-            outputs: [],
-            dependencies: payload.depends_on || [],
-            parallelGroup: payload.parallel_group || null,
-            retries: 0,
-            error: null,
-            message: null,
-          },
-        },
-      };
-
-    /**
-     * TOOL CALL
-     */
-    case "TOOL_CALL": {
-      const task = state.tasks[payload.task_id];
-      if (!task) return state;
-
-      return {
-        ...state,
-        tasks: {
-          ...state.tasks,
-          [payload.task_id]: {
-            ...task,
-            toolCalls: [
-              ...task.toolCalls,
-              {
-                tool: payload.tool,
-                input: payload.input_summary,
-                output: null,
-              },
-            ],
-          },
-        },
-      };
-    }
-
-    /**
-     * TOOL RESULT
-     */
-    case "TOOL_RESULT": {
-      const task = state.tasks[payload.task_id];
-      if (!task) return state;
-
-      const updatedCalls = [...task.toolCalls];
-      if (updatedCalls.length > 0) {
-        updatedCalls.at(-1).output =
-          payload.output_summary;
-      }
-
-      return {
-        ...state,
-        tasks: {
-          ...state.tasks,
-          [payload.task_id]: {
-            ...task,
-            toolCalls: updatedCalls,
-          },
-        },
-      };
-    }
-
-    /**
-     * PARTIAL / FINAL OUTPUT
-     */
-    case "PARTIAL_OUTPUT": {
-      const task = state.tasks[payload.task_id];
-      if (!task) return state;
-
-      return {
-        ...state,
-        tasks: {
-          ...state.tasks,
-          [payload.task_id]: {
-            ...task,
-            outputs: [
-              ...task.outputs,
-              {
-                content: payload.content,
-                isFinal: payload.is_final,
-                quality: payload.quality_score,
-                timestamp: payload.timestamp,
-              },
-            ],
-          },
-        },
-      };
-    }
-
-    /**
-     * TASK STATUS UPDATE
-     */
-    case "TASK_UPDATE": {
-      const prevTask = state.tasks[payload.task_id];
-      if (!prevTask) return state;
-
-      const isRetry =
-        payload.status === "running" && prevTask.status === "failed";
-
-      return {
-        ...state,
-        tasks: {
-          ...state.tasks,
-          [payload.task_id]: {
-            ...prevTask,
-            status: payload.status,
-            error: payload.error || null,
-            message: payload.message || null,
-            reason: payload.reason || null,
-            retries: isRetry ? prevTask.retries + 1 : prevTask.retries,
-          },
-        },
-      };
-    }
-
-    /**
-     * AGENT THOUGHT
-     */
-    case "AGENT_THOUGHT":
-      return {
-        ...state,
-        thoughts: [
-          ...state.thoughts,
-          {
-            task_id: payload.task_id,
-            thought: payload.thought,
-            timestamp: payload.timestamp,
-          },
-        ],
-      };
-
-    /**
-     * RUN COMPLETE
-     */
-    case "RUN_COMPLETE":
-      return {
-        ...state,
-        run: {
-          ...state.run,
-          status: "complete",
-        },
-        finalOutput: payload.output,
-      };
-
-    /**
-     * RUN ERROR
-     */
-    case "RUN_ERROR":
-      return {
-        ...state,
-        run: {
-          ...state.run,
-          status: "failed",
-        },
-      };
-
-    default:
-      return state;
-  }
+function getInitialState() {
+  return {
+    run: {
+      status: "idle",
+      query: "",
+      startTime: null,
+      endedAt: null,
+    },
+    tasks: {},
+    thoughts: [],
+    finalOutput: null,
+  };
 }
 
-/**
- * =========================
- * HOOK
- * =========================
- */
-export function useAgentRun() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+const terminalStatuses = new Set(["complete", "failed", "cancelled"]);
 
-  /**
-   * EVENT HANDLER (maps backend events → reducer actions)
-   */
-  const handleEvent = (event) => {
-    switch (event.type) {
-      case "run_started":
-        dispatch({ type: "RUN_STARTED", payload: event });
-        break;
+function updateTask(state, taskId, updater) {
+  const task = state.tasks[taskId];
+  if (!task) return state;
 
-      case "task_spawned":
-        dispatch({ type: "TASK_SPAWNED", payload: event });
-        break;
+  return {
+    ...state,
+    tasks: {
+      ...state.tasks,
+      [taskId]: updater(task),
+    },
+  };
+}
 
-      case "tool_call":
-        dispatch({ type: "TOOL_CALL", payload: event });
-        break;
+function handleResetRun() {
+  return getInitialState();
+}
 
-      case "tool_result":
-        dispatch({ type: "TOOL_RESULT", payload: event });
-        break;
+function handleRunStarted(_, payload) {
+  const startTime = payload.timestamp ?? Date.now();
 
-      case "partial_output":
-        dispatch({ type: "PARTIAL_OUTPUT", payload: event });
-        break;
+  return {
+    ...getInitialState(),
+    run: {
+      status: "running",
+      query: payload.query,
+      startTime,
+      endedAt: null,
+    },
+  };
+}
 
-      case "task_update":
-        dispatch({ type: "TASK_UPDATE", payload: event });
-        break;
+function handleTaskSpawned(state, payload) {
+  const timestamp = payload.timestamp ?? Date.now();
 
-      case "agent_thought":
-        dispatch({ type: "AGENT_THOUGHT", payload: event });
-        break;
+  return {
+    ...state,
+    tasks: {
+      ...state.tasks,
+      [payload.task_id]: {
+        id: payload.task_id,
+        label: payload.label,
+        agent: payload.agent,
+        status: "running",
+        startedAt: timestamp,
+        endedAt: null,
+        lastUpdatedAt: timestamp,
+        toolCalls: [],
+        outputs: [],
+        dependencies: payload.depends_on || [],
+        parallelGroup: payload.parallel_group || null,
+        retries: 0,
+        error: null,
+        message: null,
+      },
+    },
+  };
+}
 
-      case "run_complete":
-        dispatch({ type: "RUN_COMPLETE", payload: event });
-        break;
+function handleToolCall(state, payload) {
+  return updateTask(state, payload.task_id, (task) => ({
+    ...task,
+    lastUpdatedAt: payload.timestamp ?? Date.now(),
+    toolCalls: [
+      ...task.toolCalls,
+      {
+        tool: payload.tool,
+        input: payload.input_summary,
+        output: null,
+      },
+    ],
+  }));
+}
 
-      case "run_error":
-        dispatch({ type: "RUN_ERROR", payload: event });
-        break;
-
-      default:
-        console.warn("Unknown event:", event);
+function handleToolResult(state, payload) {
+  return updateTask(state, payload.task_id, (task) => {
+    const updatedCalls = [...task.toolCalls];
+    if (updatedCalls.length > 0) {
+      updatedCalls.at(-1).output = payload.output_summary;
     }
+
+    return {
+      ...task,
+      lastUpdatedAt: payload.timestamp ?? Date.now(),
+      toolCalls: updatedCalls,
+    };
+  });
+}
+
+function handlePartialOutput(state, payload) {
+  return updateTask(state, payload.task_id, (task) => ({
+    ...task,
+    lastUpdatedAt: payload.timestamp ?? Date.now(),
+    outputs: [
+      ...task.outputs,
+      {
+        content: payload.content,
+        isFinal: payload.is_final,
+        quality: payload.quality_score,
+        timestamp: payload.timestamp,
+      },
+    ],
+  }));
+}
+
+function handleTaskUpdate(state, payload) {
+  return updateTask(state, payload.task_id, (task) => {
+    const isRetry = payload.status === "running" && task.status === "failed";
+    const nextTask = {
+      ...task,
+      status: payload.status,
+      error: payload.error || null,
+      message: payload.message || null,
+      reason: payload.reason || null,
+      retries: isRetry ? task.retries + 1 : task.retries,
+      lastUpdatedAt: payload.timestamp ?? Date.now(),
+    };
+
+    if (payload.status === "running") {
+      nextTask.startedAt = payload.timestamp ?? Date.now();
+      nextTask.endedAt = null;
+    }
+
+    if (terminalStatuses.has(payload.status)) {
+      nextTask.endedAt = payload.timestamp ?? Date.now();
+    }
+
+    return nextTask;
+  });
+}
+
+function handleAgentThought(state, payload) {
+  return {
+    ...state,
+    thoughts: [
+      ...state.thoughts,
+      {
+        task_id: payload.task_id,
+        thought: payload.thought,
+        timestamp: payload.timestamp,
+      },
+    ],
+  };
+}
+
+function handleRunComplete(state, payload) {
+  return {
+    ...state,
+    run: {
+      ...state.run,
+      status: payload.status || "complete",
+      endedAt: payload.timestamp ?? Date.now(),
+    },
+    finalOutput: payload.output || null,
+  };
+}
+
+function handleRunError(state, payload) {
+  return {
+    ...state,
+    run: {
+      ...state.run,
+      status: "failed",
+      endedAt: payload.timestamp ?? Date.now(),
+    },
+  };
+}
+
+const actionHandlers = {
+  RESET_RUN: handleResetRun,
+  RUN_STARTED: handleRunStarted,
+  TASK_SPAWNED: handleTaskSpawned,
+  TOOL_CALL: handleToolCall,
+  TOOL_RESULT: handleToolResult,
+  PARTIAL_OUTPUT: handlePartialOutput,
+  TASK_UPDATE: handleTaskUpdate,
+  AGENT_THOUGHT: handleAgentThought,
+  RUN_COMPLETE: handleRunComplete,
+  RUN_ERROR: handleRunError,
+};
+
+function reducer(state, action) {
+  const handler = actionHandlers[action.type];
+  return handler ? handler(state, action.payload) : state;
+}
+
+export function useAgentRun() {
+  const [state, dispatch] = useReducer(reducer, undefined, getInitialState);
+
+  const resetRun = () => {
+    dispatch({ type: "RESET_RUN" });
+  };
+
+  const handleEvent = (event) => {
+    const eventToAction = {
+      run_started: "RUN_STARTED",
+      task_spawned: "TASK_SPAWNED",
+      tool_call: "TOOL_CALL",
+      tool_result: "TOOL_RESULT",
+      partial_output: "PARTIAL_OUTPUT",
+      task_update: "TASK_UPDATE",
+      agent_thought: "AGENT_THOUGHT",
+      run_complete: "RUN_COMPLETE",
+      run_error: "RUN_ERROR",
+    }[event.type];
+
+    if (!eventToAction) {
+      console.warn("Unknown event:", event);
+      return;
+    }
+
+    dispatch({ type: eventToAction, payload: event });
   };
 
   return {
     state,
     handleEvent,
+    resetRun,
   };
 }
